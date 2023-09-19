@@ -61,7 +61,7 @@ class FacebookStream(RESTStream):
         Returns:
             The next pagination token.
         """
-        print(response.content)
+        # print(response.content)
         if self.next_page_token_jsonpath:
             all_matches = extract_jsonpath(
                 self.next_page_token_jsonpath,

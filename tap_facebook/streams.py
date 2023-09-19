@@ -135,32 +135,7 @@ class AdsInsightStream(FacebookStream):
     replication_keys = ["date_start"]
     replication_method = "incremental"
 
-    schema = PropertiesList(
-        Property("account_id", StringType),
-        Property("account_name", StringType),
-        Property("campaign_id", StringType),
-        Property("campaign_name", StringType),
-        Property("date_start", DateTimeType),
-        Property("date_stop", StringType),
-        Property("spend", StringType),
-        Property("impressions", StringType),
-        Property("clicks", StringType),
-        Property("country", StringType),
-        Property("unique_inline_link_click_ctr", StringType),
-        Property(
-            "conversions",
-            ArrayType(
-                ObjectType(
-                    Property("action_type", StringType),
-                    Property("value", StringType),
-                ),
-            ),
-        ),
-    ).to_dict()
-
     tap_stream_id = "adsinsights"
-
-    # OLD Meltano Configuration below.
 
     # columns_remaining = [  # noqa: RUF012
     #     "unique_actions",
@@ -179,35 +154,35 @@ class AdsInsightStream(FacebookStream):
         Property("clicks", StringType),
         Property("date_stop", StringType),
         Property("ad_id", StringType),
-        Property(
-            "website_ctr",
-            ArrayType(
-                ObjectType(
-                    Property("value", StringType),
-                    Property("action_destination", StringType),
-                    Property("action_target_id", StringType),
-                    Property("action_type", StringType),
-                ),
-            ),
-        ),
+        Property("website_ctr", StringType),
+        # Property(
+        #     "website_ctr",
+        #     ArrayType(
+        #         ObjectType(
+        #             Property("value", StringType),
+        #             Property("action_type", StringType),
+        #         ),
+        #     ),
+        # ),
         Property("unique_inline_link_click_ctr", StringType),
         Property("adset_id", StringType),
         Property("frequency", StringType),
         Property("account_name", StringType),
         Property("canvas_avg_view_time", StringType),
         Property("unique_inline_link_clicks", StringType),
-        Property(
-            "cost_per_unique_action_type",
-            ArrayType(
-                ObjectType(
-                    Property("value", StringType),
-                    Property("action_type", StringType),
-                ),
-            ),
-        ),
+        # Property(
+        #     "cost_per_unique_action_type",
+        #     ArrayType(
+        #         ObjectType(
+        #             Property("value", StringType),
+        #             Property("action_type", StringType),
+        #         ),
+        #     ),
+        # ),
+        Property("cost_per_unique_action_type", StringType),
         Property("inline_post_engagement", StringType),
         Property("campaign_name", StringType),
-        Property("inline_link_clicks", IntegerType),
+        Property("inline_link_clicks", StringType),
         Property("campaign_id", StringType),
         Property("cpc", StringType),
         Property("ad_name", StringType),
@@ -216,7 +191,8 @@ class AdsInsightStream(FacebookStream):
         Property("cost_per_inline_post_engagement", StringType),
         Property("inline_link_click_ctr", StringType),
         Property("cpp", StringType),
-        Property("cost_per_action_type", ArrayType(ObjectType())),
+        Property("cost_per_action_type", StringType),
+        # Property("cost_per_action_type", ArrayType(ObjectType())),
         Property("unique_link_clicks_ctr", StringType),
         Property("spend", StringType),
         Property("cost_per_unique_click", StringType),
@@ -230,20 +206,21 @@ class AdsInsightStream(FacebookStream):
         Property("quality_ranking", StringType),
         Property("engagement_rate_ranking", StringType),
         Property("conversion_rate_ranking", StringType),
-        Property("impressions", IntegerType),
+        Property("impressions", StringType),
         Property("unique_ctr", StringType),
         Property("cost_per_inline_link_click", StringType),
         Property("ctr", StringType),
-        Property("reach", IntegerType),
-        Property(
-            "actions",
-            ArrayType(
-                ObjectType(
-                    Property("action_type", StringType),
-                    Property("value", StringType),
-                ),
-            ),
-        ),
+        Property("reach", StringType),
+        Property("actions", StringType),
+        # Property(
+        #     "actions",
+        #     ArrayType(
+        #         ObjectType(
+        #             Property("action_type", StringType),
+        #             Property("value", StringType),
+        #         ),
+        #     ),
+        # ),
     ).to_dict()
 
     tap_stream_id = "adsinsights"
