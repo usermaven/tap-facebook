@@ -5,6 +5,9 @@ from __future__ import annotations
 import typing as t
 from pathlib import Path
 
+from datetime import date, datetime, timedelta
+from typing import Generator
+
 from singer_sdk import typing as th  # JSON Schema typing helpers
 from singer_sdk.typing import (
     ArrayType,
@@ -36,69 +39,141 @@ class AdsInsightStream(FacebookStream):
     tap_stream_id = stream id
     """
 
-    columns = [  # noqa: RUF012
-        "account_id",
-        "ad_id",
-        "adset_id",
-        "campaign_id",
-        "ad_name",
-        "adset_name",
-        "campaign_name",
-        "date_start",
-        "date_stop",
-        "clicks",
-        "website_ctr",
-        "unique_inline_link_click_ctr",
-        "frequency",
-        "account_name",
-        "unique_inline_link_clicks",
-        "cost_per_unique_action_type",
-        "inline_post_engagement",
-        "inline_link_clicks",
-        "cpc",
-        "cost_per_unique_inline_link_click",
-        "cpm",
-        "canvas_avg_view_time",
-        "cost_per_inline_post_engagement",
-        "inline_link_click_ctr",
-        "cpp",
-        "cost_per_action_type",
-        "unique_link_clicks_ctr",
-        "spend",
-        "cost_per_unique_click",
-        "unique_clicks",
-        "social_spend",
-        "reach",
-        "canvas_avg_view_percent",
-        "objective",
-        "quality_ranking",
-        "engagement_rate_ranking",
-        "conversion_rate_ranking",
-        "impressions",
-        "unique_ctr",
-        "cost_per_inline_link_click",
-        "ctr",
-    ]
-
-    columns_remaining = [  # noqa: RUF012
-        "unique_actions",
-        "actions",
-        "action_values",
-        "outbound_clicks",
-        "unique_outbound_clicks",
-        "video_30_sec_watched_actions",
-        "video_p25_watched_actions",
-        "video_p50_watched_actions",
-        "video_p75_watched_actions",
-        "video_p100_watched_actions",
-    ]
-
     name = "adsinsights"
 
-    path = f"/insights?level=ad&fields={columns}"
+    def datetime_range(
+        self, start: date, end: date, delta: timedelta
+    ) -> Generator[datetime, None, None]:
+        delta_units = int((end - start) / delta)
 
-    replication_keys = ["date_start"]  # noqa: RUF012
+        for _ in range(delta_units):
+            yield start
+            start += delta
+
+    def get_records(self, context: dict | None) -> t.Iterable[dict[str, t.Any]]:
+        start_date = (
+            datetime.strptime(self.config.get("start_date", ""), "%Y-%m-%d").date()
+            if self.config.get("start_date", "")
+            else (date.today() - timedelta(days=30))
+        )
+        end_date = (
+            datetime.strptime(self.config.get("end_date", ""), "%Y-%m-%d").date()
+            if self.config.get("end_date", "")
+            else date.today()
+        )
+        delta = timedelta(days=1)
+        for current_start in self.datetime_range(start_date, end_date, delta):
+            if context is None:
+                context = {}
+            context["current_start"] = current_start
+            context["current_end"] = current_start
+
+            for record in self.request_records(context):
+                transformed_record = self.post_process(record, context)
+                if transformed_record is None:
+                    # Record filtered out during post_process()
+                    continue
+                yield transformed_record
+
+    def get_url(self, context: dict | None) -> str:
+        url = FacebookStream.get_url(self, context)
+        start_date = context["current_start"].strftime("%Y-%m-%d")
+        end_date = context["current_end"].strftime("%Y-%m-%d")
+        time_range = f"{{'since':'{start_date}', 'until':'{end_date}'}}"
+        url = url + f"&time_range={time_range}"
+        return url
+
+    @property
+    def path(self) -> str:
+        columns = [  # noqa: RUF012
+            "account_id",
+            "ad_id",
+            "adset_id",
+            "campaign_id",
+            "ad_name",
+            "adset_name",
+            "campaign_name",
+            "date_start",
+            "date_stop",
+            "clicks",
+            "website_ctr",
+            "unique_inline_link_click_ctr",
+            "frequency",
+            "account_name",
+            "unique_inline_link_clicks",
+            "cost_per_unique_action_type",
+            "inline_post_engagement",
+            "inline_link_clicks",
+            "cpc",
+            "cost_per_unique_inline_link_click",
+            "cpm",
+            "canvas_avg_view_time",
+            "cost_per_inline_post_engagement",
+            "inline_link_click_ctr",
+            "cpp",
+            "cost_per_action_type",
+            "unique_link_clicks_ctr",
+            "spend",
+            "cost_per_unique_click",
+            "unique_clicks",
+            "social_spend",
+            "reach",
+            "canvas_avg_view_percent",
+            "objective",
+            "quality_ranking",
+            "engagement_rate_ranking",
+            "conversion_rate_ranking",
+            "impressions",
+            "unique_ctr",
+            "cost_per_inline_link_click",
+            "ctr",
+        ]
+
+        # timerange = f"timerange={{'since':'2023-04-10', 'until':'2023-04-11'}}"
+        return f"/insights?level=ad&filtering=[{{field:'ad.impressions',operator:'GREATER_THAN',value:0}}]&fields={columns}"
+
+    replication_keys = ["date_start"]
     replication_method = "incremental"
+
+    schema = PropertiesList(
+        Property("account_id", StringType),
+        Property("account_name", StringType),
+        Property("campaign_id", StringType),
+        Property("campaign_name", StringType),
+        Property("date_start", DateTimeType),
+        Property("date_stop", StringType),
+        Property("spend", StringType),
+        Property("impressions", StringType),
+        Property("clicks", StringType),
+        Property("country", StringType),
+        Property("unique_inline_link_click_ctr", StringType),
+        Property(
+            "conversions",
+            ArrayType(
+                ObjectType(
+                    Property("action_type", StringType),
+                    Property("value", StringType),
+                ),
+            ),
+        ),
+    ).to_dict()
+
+    tap_stream_id = "adsinsights"
+
+    # OLD Meltano Configuration below.
+
+    # columns_remaining = [  # noqa: RUF012
+    #     "unique_actions",
+    #     "actions",
+    #     "action_values",
+    #     "outbound_clicks",
+    #     "unique_outbound_clicks",
+    #     "video_30_sec_watched_actions",
+    #     "video_p25_watched_actions",
+    #     "video_p50_watched_actions",
+    #     "video_p75_watched_actions",
+    #     "video_p100_watched_actions",
+    # ]
 
     schema = PropertiesList(
         Property("clicks", StringType),
@@ -187,7 +262,8 @@ class AdsInsightStream(FacebookStream):
         Returns:
             A dictionary of URL query parameters.
         """
-        params: dict = {"limit": 25}
+        params: dict = {}
+        params["limit"] = 25
         if next_page_token is not None:
             params["after"] = next_page_token
         if self.replication_key:
@@ -198,17 +274,147 @@ class AdsInsightStream(FacebookStream):
 
         return params
 
-    def post_process(
-        self,
-        row: dict,
-        context: dict | None = None,  # noqa: ARG002
-    ) -> dict | None:
-        row["inline_link_clicks"] = (
-            int(row["inline_link_clicks"]) if "inline_link_clicks" in row else None
+    # def post_process(
+    #     self,
+    #     row: dict,
+    #     context: dict | None = None,  # noqa: ARG002
+    # ) -> dict | None:
+    #     row["inline_link_clicks"] = (
+    #         int(row["inline_link_clicks"]) if "inline_link_clicks" in row else None
+    #     )
+    #     row["impressions"] = int(row["impressions"]) if "impressions" in row else None
+    #     row["reach"] = int(row["reach"]) if "reach" in row else None
+    #     return row
+
+
+# ads insights stream
+class CampaignsInsightStream(FacebookStream):
+    """https://developers.facebook.com/docs/marketing-api/insights."""
+
+    """
+    columns: columns which will be added to fields parameter in api
+    name: stream name
+    account_id: facebook account
+    path: path which will be added to api url in client.py
+    schema: instream schema
+    tap_stream_id = stream id
+    """
+
+    name = "campaignsinsights"
+
+    def datetime_range(
+        self, start: date, end: date, delta: timedelta
+    ) -> Generator[datetime, None, None]:
+        delta_units = int((end - start) / delta)
+
+        for _ in range(delta_units):
+            yield start
+            start += delta
+
+    def get_records(self, context: dict | None) -> t.Iterable[dict[str, t.Any]]:
+        start_date = (
+            datetime.strptime(self.config.get("start_date", ""), "%Y-%m-%d").date()
+            if self.config.get("start_date", "")
+            else (date.today() - timedelta(days=30))
         )
-        row["impressions"] = int(row["impressions"]) if "impressions" in row else None
-        row["reach"] = int(row["reach"]) if "reach" in row else None
-        return row
+        end_date = (
+            datetime.strptime(self.config.get("end_date", ""), "%Y-%m-%d").date()
+            if self.config.get("end_date", "")
+            else date.today()
+        )
+        delta = timedelta(days=1)
+        for current_start in self.datetime_range(start_date, end_date, delta):
+            if context is None:
+                context = {}
+            context["current_start"] = current_start
+            context["current_end"] = current_start
+
+            for record in self.request_records(context):
+                transformed_record = self.post_process(record, context)
+                if transformed_record is None:
+                    # Record filtered out during post_process()
+                    continue
+                yield transformed_record
+
+    def get_url(self, context: dict | None) -> str:
+        url = FacebookStream.get_url(self, context)
+        start_date = context["current_start"].strftime("%Y-%m-%d")
+        end_date = context["current_end"].strftime("%Y-%m-%d")
+        time_range = f"{{'since':'{start_date}', 'until':'{end_date}'}}"
+        url = url + f"&time_range={time_range}"
+        return url
+
+    @property
+    def path(self) -> str:
+        columns = [
+            "account_id",
+            "account_name",
+            "campaign_id",
+            "campaign_name",
+            "date_start",
+            "date_stop",
+            "spend",
+            "impressions",
+            "clicks",
+            "conversions",
+        ]
+
+        # timerange = f"timerange={{'since':'2023-04-10', 'until':'2023-04-11'}}"
+        return f"/insights?level=campaign&filtering=[{{field:'ad.impressions',operator:'GREATER_THAN',value:0}}]&fields={columns}"
+
+    replication_keys = ["date_start"]
+    replication_method = "incremental"
+
+    schema = PropertiesList(
+        Property("account_id", StringType),
+        Property("account_name", StringType),
+        Property("campaign_id", StringType),
+        Property("campaign_name", StringType),
+        Property("date_start", DateTimeType),
+        Property("date_stop", StringType),
+        Property("spend", StringType),
+        Property("impressions", StringType),
+        Property("clicks", StringType),
+        Property("country", StringType),
+        Property("unique_inline_link_click_ctr", StringType),
+        Property(
+            "conversions",
+            ArrayType(
+                ObjectType(
+                    Property("action_type", StringType),
+                    Property("value", StringType),
+                ),
+            ),
+        ),
+    ).to_dict()
+
+    tap_stream_id = "campaignsinsights"
+
+    def get_url_params(
+        self,
+        context: dict | None,  # noqa: ARG002
+        next_page_token: t.Any | None,  # noqa: ANN401
+    ) -> dict[str, t.Any]:
+        """Return a dictionary of values to be used in URL parameterization.
+
+        Args:
+            context: The stream context.
+            next_page_token: The next page index or value.
+
+        Returns:
+            A dictionary of URL query parameters.
+        """
+        params: dict = {}
+        params["limit"] = 25
+        if next_page_token is not None:
+            params["after"] = next_page_token
+        if self.replication_key:
+            params["sort"] = "asc"
+            params["order_by"] = self.replication_key
+
+        params["action_attribution_windows"] = '["1d_view","7d_click"]'
+
+        return params
 
 
 # ads stream

@@ -26,14 +26,14 @@ class FacebookStream(RESTStream):
 
     @property
     def url_base(self) -> str:
-        version: str = self.config["api_version"]
-        account_id: str = self.config["account_id"]
+        version = self.config.get("api_version", "")
+        account_id = self.config.get("account_id", "")
         return f"https://graph.facebook.com/{version}/act_{account_id}"
 
     records_jsonpath = "$.data[*]"  # Or override `parse_response`.
     next_page_token_jsonpath = "$.paging.cursors.after"  # noqa: S105
 
-    tolerated_http_errors: list[int] = []  # noqa: RUF012
+    tolerated_http_errors: list[int] = []
 
     @property
     def authenticator(self) -> BearerTokenAuthenticator:
@@ -44,14 +44,14 @@ class FacebookStream(RESTStream):
         """
         return BearerTokenAuthenticator.create_for_stream(
             self,
-            token=self.config["access_token"],
+            token=self.config.get("access_token", ""),
         )
 
     def get_next_page_token(
         self,
         response: requests.Response,
-        previous_token: t.Any | None,  # noqa: ARG002, ANN401
-    ) -> t.Any | None:  # noqa: ANN401
+        previous_token: t.Any | None,  # noqa: ARG002
+    ) -> t.Any | None:
         """Return a token for identifying next page or None if no more pages.
 
         Args:
@@ -61,19 +61,23 @@ class FacebookStream(RESTStream):
         Returns:
             The next pagination token.
         """
-        if not self.next_page_token_jsonpath:
-            return response.headers.get("X-Next-Page", None)
+        print(response.content)
+        if self.next_page_token_jsonpath:
+            all_matches = extract_jsonpath(
+                self.next_page_token_jsonpath,
+                response.json(),
+            )
+            first_match = next(iter(all_matches), None)
+            next_page_token = first_match
+        else:
+            next_page_token = response.headers.get("X-Next-Page", None)
 
-        all_matches = extract_jsonpath(
-            self.next_page_token_jsonpath,
-            response.json(),
-        )
-        return next(iter(all_matches), None)
+        return next_page_token
 
     def get_url_params(
         self,
         context: dict | None,  # noqa: ARG002
-        next_page_token: t.Any | None,  # noqa: ANN401
+        next_page_token: t.Any | None,
     ) -> dict[str, t.Any]:
         """Return a dictionary of values to be used in URL parameterization.
 
@@ -84,7 +88,8 @@ class FacebookStream(RESTStream):
         Returns:
             A dictionary of URL query parameters.
         """
-        params: dict = {"limit": 25}
+        params: dict = {}
+        params["limit"] = 25
         if next_page_token is not None:
             params["after"] = next_page_token
         if self.replication_key:
@@ -96,7 +101,7 @@ class FacebookStream(RESTStream):
     def prepare_request_payload(
         self,
         context: dict | None,  # noqa: ARG002
-        next_page_token: t.Any | None,  # noqa: ARG002, ANN401
+        next_page_token: t.Any | None,  # noqa: ARG002
     ) -> dict | None:
         """Prepare the data payload for the REST API request.
 
@@ -111,6 +116,7 @@ class FacebookStream(RESTStream):
         """
         return None
 
+    ##TODO: ADD ERROR HANDLING FOR API RATE LIMIT - WORKING IN API-LIMIT-HANDLING BRANCH
     def validate_response(self, response: requests.Response) -> None:
         """Validate HTTP response.
 
