@@ -125,6 +125,7 @@ class FacebookStream(RESTStream):
             RetriableAPIError: If the request is retriable.
         """
         full_path = urlparse(response.url).path
+        # print(response.url)
         if response.status_code in self.tolerated_http_errors:
             msg = (
                 f"{response.status_code} Tolerated Status Code "

@@ -1,7 +1,7 @@
 """Stream type classes for tap-facebook."""
 
 from __future__ import annotations
-
+import logging
 import typing as t
 from pathlib import Path
 
@@ -24,6 +24,8 @@ from singer_sdk.typing import (
 from tap_facebook.client import FacebookStream
 
 SCHEMAS_DIR = Path(__file__).parent / Path("./schemas")
+
+logger = logging.getLogger()
 
 
 # ads insights stream
@@ -93,44 +95,30 @@ class AdsInsightStream(FacebookStream):
             "ad_name",
             "adset_name",
             "campaign_name",
-            "date_start",
-            "date_stop",
             "clicks",
-            "website_ctr",
-            "unique_inline_link_click_ctr",
-            "frequency",
             "account_name",
-            "unique_inline_link_clicks",
-            "cost_per_unique_action_type",
-            "inline_post_engagement",
-            "inline_link_clicks",
             "cpc",
-            "cost_per_unique_inline_link_click",
             "cpm",
-            "canvas_avg_view_time",
-            "cost_per_inline_post_engagement",
-            "inline_link_click_ctr",
             "cpp",
-            "cost_per_action_type",
-            "unique_link_clicks_ctr",
-            "spend",
-            "cost_per_unique_click",
-            "unique_clicks",
-            "social_spend",
             "reach",
-            "canvas_avg_view_percent",
-            "objective",
-            "quality_ranking",
-            "engagement_rate_ranking",
-            "conversion_rate_ranking",
             "impressions",
             "unique_ctr",
-            "cost_per_inline_link_click",
             "ctr",
+            "spend",
+            "cost_per_action_type",
+            "unique_link_clicks_ctr",
+            "cost_per_unique_click",
+            "unique_clicks",
+            "conversions",
+            "cost_per_conversion",
+            "website_purchase_roas",
+            "actions",
+            "action_values",
+            "cost_per_unique_action_type",
         ]
 
         # timerange = f"timerange={{'since':'2023-04-10', 'until':'2023-04-11'}}"
-        return f"/insights?level=ad&filtering=[{{field:'ad.impressions',operator:'GREATER_THAN',value:0}}]&fields={columns}"
+        return f"/insights?level=ad&&fields={columns}"
 
     replication_keys = ["date_start"]
     replication_method = "incremental"
@@ -154,76 +142,45 @@ class AdsInsightStream(FacebookStream):
         Property("clicks", StringType),
         Property("date_stop", StringType),
         Property("ad_id", StringType),
-        Property("website_ctr", StringType),
-        # Property(
-        #     "website_ctr",
-        #     ArrayType(
-        #         ObjectType(
-        #             Property("value", StringType),
-        #             Property("action_type", StringType),
-        #         ),
-        #     ),
-        # ),
-        Property("unique_inline_link_click_ctr", StringType),
         Property("adset_id", StringType),
-        Property("frequency", StringType),
+        Property("account_id", StringType),
         Property("account_name", StringType),
-        Property("canvas_avg_view_time", StringType),
-        Property("unique_inline_link_clicks", StringType),
-        # Property(
-        #     "cost_per_unique_action_type",
-        #     ArrayType(
-        #         ObjectType(
-        #             Property("value", StringType),
-        #             Property("action_type", StringType),
-        #         ),
-        #     ),
-        # ),
-        Property("cost_per_unique_action_type", StringType),
-        Property("inline_post_engagement", StringType),
         Property("campaign_name", StringType),
-        Property("inline_link_clicks", StringType),
         Property("campaign_id", StringType),
         Property("cpc", StringType),
         Property("ad_name", StringType),
-        Property("cost_per_unique_inline_link_click", StringType),
         Property("cpm", StringType),
-        Property("cost_per_inline_post_engagement", StringType),
-        Property("inline_link_click_ctr", StringType),
         Property("cpp", StringType),
-        Property("cost_per_action_type", StringType),
-        # Property("cost_per_action_type", ArrayType(ObjectType())),
-        Property("unique_link_clicks_ctr", StringType),
         Property("spend", StringType),
         Property("cost_per_unique_click", StringType),
         Property("adset_name", StringType),
-        Property("unique_clicks", StringType),
-        Property("social_spend", StringType),
-        Property("canvas_avg_view_percent", StringType),
-        Property("account_id", StringType),
-        Property("date_start", DateTimeType),
-        Property("objective", StringType),
-        Property("quality_ranking", StringType),
-        Property("engagement_rate_ranking", StringType),
-        Property("conversion_rate_ranking", StringType),
         Property("impressions", StringType),
         Property("unique_ctr", StringType),
-        Property("cost_per_inline_link_click", StringType),
         Property("ctr", StringType),
         Property("reach", StringType),
-        Property("actions", StringType),
-        # Property(
-        #     "actions",
-        #     ArrayType(
-        #         ObjectType(
-        #             Property("action_type", StringType),
-        #             Property("value", StringType),
-        #         ),
-        #     ),
-        # ),
+        Property("cost_per_unique_action_type", StringType, default="[]"),
+        Property("cost_per_action_type", StringType, default="[]"),
+        Property("actions", StringType, default="[]"),
+        Property("action_values", StringType, default="[]"),
+        Property("conversions", StringType, default="[]"),
+        Property("cost_per_conversion", StringType, default="[]"),
+        Property("website_purchase_roas", StringType, default="[]"),
+        ## Additional properties
+        # Property("unique_link_clicks_ctr", StringType),
+        # Property("unique_clicks", StringType),
+        # Property("social_spend", StringType),
+        # Property("account_id", StringType),
+        # Property("date_start", DateTimeType),
     ).to_dict()
 
     tap_stream_id = "adsinsights"
+
+    def post_process(
+        self,
+        row: dict,
+        context: dict | None = None,  # noqa: ARG002
+    ) -> dict | None:
+        return row
 
     def get_url_params(
         self,
@@ -247,8 +204,9 @@ class AdsInsightStream(FacebookStream):
             params["sort"] = "asc"
             params["order_by"] = self.replication_key
 
-        params["action_attribution_windows"] = '["1d_view","7d_click"]'
-
+        params["action_attribution_windows"] = '["7d_click"]'
+        params["time_range"] = '{"since":"2021-01-01","until":"2023-09-21"}'
+        params["increment"] = 1
         return params
 
     # def post_process(
@@ -411,8 +369,8 @@ class AdsStream(FacebookStream):
         "account_id",
         "adset_id",
         "campaign_id",
-        "bid_type",
-        "bid_info",
+        # "bid_type",
+        # "bid_info",
         "status",
         "updated_time",
         "created_time",
@@ -420,7 +378,7 @@ class AdsStream(FacebookStream):
         "effective_status",
         "last_updated_by_app_id",
         "source_ad_id",
-        "creative",
+        # "creative",
         "tracking_specs",
         "conversion_specs",
         "recommendations",
@@ -444,107 +402,113 @@ class AdsStream(FacebookStream):
         Property("account_id", StringType),
         Property("campaign_id", StringType),
         Property("adset_id", StringType),
-        Property(
-            "adlabels",
-            ArrayType(
-                ObjectType(
-                    Property("id", StringType),
-                    Property("created_time", DateTimeType),
-                    Property("name", StringType),
-                    Property("updated_time", DateTimeType),
-                ),
-            ),
-        ),
-        Property("bid_amount", IntegerType),
-        Property(
-            "bid_info",
-            ObjectType(
-                Property("CLICKS", IntegerType),
-                Property("ACTIONS", IntegerType),
-                Property("REACH", IntegerType),
-                Property("IMPRESSIONS", IntegerType),
-                Property("SOCIAL", IntegerType),
-            ),
-        ),
+        Property("adlabels", StringType),
+        # Property(
+        #     "adlabels",
+        #     ArrayType(
+        #         ObjectType(
+        #             Property("id", StringType),
+        #             Property("created_time", DateTimeType),
+        #             Property("name", StringType),
+        #             Property("updated_time", DateTimeType),
+        #         ),
+        #     ),
+        # ),
+        # Property("bid_amount", IntegerType),
+        # Property("bid_info", StringType, default=""),
+        # Property(
+        #     "bid_info",
+        #     ObjectType(
+        #         Property("CLICKS", IntegerType),
+        #         Property("ACTIONS", IntegerType),
+        #         Property("REACH", IntegerType),
+        #         Property("IMPRESSIONS", IntegerType),
+        #         Property("SOCIAL", IntegerType),
+        #     ),
+        # ),
         Property("status", StringType),
-        Property(
-            "creative",
-            ObjectType(Property("creative_id", StringType), Property("id", StringType)),
-        ),
+        # Property("creative", StringType),
+        # Property(
+        #     "creative",
+        #     ObjectType(Property("creative_id", StringType), Property("id", StringType)),
+        # ),
         Property("id", StringType),
         Property("updated_time", StringType),
         Property("created_time", StringType),
         Property("name", StringType),
         Property("effective_status", StringType),
         Property("last_updated_by_app_id", StringType),
-        Property(
-            "recommendations",
-            ArrayType(
-                ObjectType(
-                    Property("blame_field", StringType),
-                    Property("code", IntegerType),
-                    Property("confidence", StringType),
-                    Property("importance", StringType),
-                    Property("message", StringType),
-                    Property("title", StringType),
-                ),
-            ),
-        ),
+        Property("recommendations", StringType),
+        # Property(
+        #     "recommendations",
+        #     ArrayType(
+        #         ObjectType(
+        #             Property("blame_field", StringType),
+        #             Property("code", IntegerType),
+        #             Property("confidence", StringType),
+        #             Property("importance", StringType),
+        #             Property("message", StringType),
+        #             Property("title", StringType),
+        #         ),
+        #     ),
+        # ),
         Property("source_ad_id", StringType),
-        Property(
-            "tracking_specs",
-            ArrayType(
-                ObjectType(
-                    Property(
-                        "application",
-                        ArrayType(ObjectType(Property("items", StringType))),
-                    ),
-                    Property("post", ArrayType(StringType)),
-                    Property("conversion_id", ArrayType(StringType)),
-                    Property("action.type", ArrayType(Property("items", StringType))),
-                    Property("post.type", ArrayType(Property("items", StringType))),
-                    Property("page", ArrayType(Property("items", StringType))),
-                    Property("creative", ArrayType(Property("items", StringType))),
-                    Property("dataset", ArrayType(Property("items", StringType))),
-                    Property("event", ArrayType(Property("items", StringType))),
-                    Property("event.creator", ArrayType(Property("items", StringType))),
-                    Property("event_type", ArrayType(Property("items", StringType))),
-                    Property("fb_pixel", ArrayType(Property("items", StringType))),
-                    Property(
-                        "fb_pixel_event",
-                        ArrayType(Property("items", StringType)),
-                    ),
-                    Property("leadgen", ArrayType(Property("items", StringType))),
-                    Property("object", ArrayType(Property("items", StringType))),
-                    Property("object.domain", ArrayType(Property("items", StringType))),
-                    Property("offer", ArrayType(Property("items", StringType))),
-                    Property("offer.creator", ArrayType(Property("items", StringType))),
-                    Property("offsite_pixel", ArrayType(Property("items", StringType))),
-                    Property("page.parent", ArrayType(Property("items", StringType))),
-                    Property("post.object", ArrayType(Property("items", StringType))),
-                    Property(
-                        "post.object.wall",
-                        ArrayType(Property("items", StringType)),
-                    ),
-                    Property("question", ArrayType(Property("items", StringType))),
-                    Property(
-                        "question.creator",
-                        ArrayType(Property("items", StringType)),
-                    ),
-                    Property("response", ArrayType(Property("items", StringType))),
-                    Property("subtype", ArrayType(Property("items", StringType))),
-                ),
-            ),
-        ),
-        Property(
-            "conversion_specs",
-            ArrayType(
-                ObjectType(
-                    Property("action.type", ArrayType(StringType)),
-                    Property("conversion_id", ArrayType(StringType)),
-                ),
-            ),
-        ),
+        Property("tracking_specs", StringType),
+        # Property(
+        #     "tracking_specs",
+        #     ArrayType(
+        #         ObjectType(
+        #             Property(
+        #                 "application",
+        #                 ArrayType(ObjectType(Property("items", StringType))),
+        #             ),
+        #             Property("post", ArrayType(StringType)),
+        #             Property("conversion_id", ArrayType(StringType)),
+        #             Property("action.type", ArrayType(Property("items", StringType))),
+        #             Property("post.type", ArrayType(Property("items", StringType))),
+        #             Property("page", ArrayType(Property("items", StringType))),
+        #             Property("creative", ArrayType(Property("items", StringType))),
+        #             Property("dataset", ArrayType(Property("items", StringType))),
+        #             Property("event", ArrayType(Property("items", StringType))),
+        #             Property("event.creator", ArrayType(Property("items", StringType))),
+        #             Property("event_type", ArrayType(Property("items", StringType))),
+        #             Property("fb_pixel", ArrayType(Property("items", StringType))),
+        #             Property(
+        #                 "fb_pixel_event",
+        #                 ArrayType(Property("items", StringType)),
+        #             ),
+        #             Property("leadgen", ArrayType(Property("items", StringType))),
+        #             Property("object", ArrayType(Property("items", StringType))),
+        #             Property("object.domain", ArrayType(Property("items", StringType))),
+        #             Property("offer", ArrayType(Property("items", StringType))),
+        #             Property("offer.creator", ArrayType(Property("items", StringType))),
+        #             Property("offsite_pixel", ArrayType(Property("items", StringType))),
+        #             Property("page.parent", ArrayType(Property("items", StringType))),
+        #             Property("post.object", ArrayType(Property("items", StringType))),
+        #             Property(
+        #                 "post.object.wall",
+        #                 ArrayType(Property("items", StringType)),
+        #             ),
+        #             Property("question", ArrayType(Property("items", StringType))),
+        #             Property(
+        #                 "question.creator",
+        #                 ArrayType(Property("items", StringType)),
+        #             ),
+        #             Property("response", ArrayType(Property("items", StringType))),
+        #             Property("subtype", ArrayType(Property("items", StringType))),
+        #         ),
+        #     ),
+        # ),
+        Property("conversion_specs", StringType),
+        # Property(
+        #     "conversion_specs",
+        #     ArrayType(
+        #         ObjectType(
+        #             Property("action.type", ArrayType(StringType)),
+        #             Property("conversion_id", ArrayType(StringType)),
+        #         ),
+        #     ),
+        # ),
         Property("placement_specific_facebook_unsafe_substances", StringType),
         Property("placement_specific_instagram_unsafe_substances", StringType),
         Property("global_unsafe_substances", StringType),
@@ -623,15 +587,15 @@ class AdsStream(FacebookStream):
         Property("global_ads_about_social_issues_elections_or_politics", StringType),
         Property("configured_status", StringType),
         Property("conversion_domain", StringType),
-        Property(
-            "conversion_specs",
-            ArrayType(
-                ObjectType(
-                    Property("action.type", ArrayType(StringType)),
-                    Property("conversion_id", ArrayType(StringType)),
-                ),
-            ),
-        ),
+        # Property(
+        #     "conversion_specs",
+        #     ArrayType(
+        #         ObjectType(
+        #             Property("action.type", ArrayType(StringType)),
+        #             Property("conversion_id", ArrayType(StringType)),
+        #         ),
+        #     ),
+        # ),
         Property("placement_specific_instagram_advertising_policies", StringType),
         Property("recommendation_data", ArrayType(Property("items", StringType))),
         Property("application", ArrayType(Property("items", StringType))),
