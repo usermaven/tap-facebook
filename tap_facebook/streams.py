@@ -115,6 +115,8 @@ class AdsInsightStream(FacebookStream):
             "actions",
             "action_values",
             "cost_per_unique_action_type",
+            "date_start",
+            "date_stop",
         ]
 
         # timerange = f"timerange={{'since':'2023-04-10', 'until':'2023-04-11'}}"
@@ -165,6 +167,8 @@ class AdsInsightStream(FacebookStream):
         Property("conversions", StringType, default="[]"),
         Property("cost_per_conversion", StringType, default="[]"),
         Property("website_purchase_roas", StringType, default="[]"),
+        Property("date_start", DateTimeType),
+        Property("date_stop", DateTimeType),
         ## Additional properties
         # Property("unique_link_clicks_ctr", StringType),
         # Property("unique_clicks", StringType),
@@ -203,9 +207,12 @@ class AdsInsightStream(FacebookStream):
         if self.replication_key:
             params["sort"] = "asc"
             params["order_by"] = self.replication_key
-
+        today_date = datetime.now().date()
+        formatted_date = today_date.strftime("%Y-%m-%d")
         params["action_attribution_windows"] = '["7d_click"]'
-        params["time_range"] = '{"since":"2021-01-01","until":"2023-09-21"}'
+        time_range = f"{{'since':'2021-01-01', 'until':'{formatted_date}'}}"
+        params["time_range"] = time_range
+
         params["increment"] = 1
         return params
 
