@@ -8,7 +8,7 @@ from pathlib import Path
 from datetime import date, datetime, timedelta
 from typing import Generator
 
-from singer_sdk import typing as th  # JSON Schema typing helpers
+from singer_sdk import Stream, typing as th  # JSON Schema typing helpers
 from singer_sdk.typing import (
     ArrayType,
     BooleanType,
@@ -42,6 +42,10 @@ class AdsInsightStream(FacebookStream):
     """
 
     name = "adsinsights"
+    replication_keys = ["current_start"]
+    replication_method = "incremental"
+    state_message_frequency = 10
+    tap_stream_id = "adsinsights"
 
     def datetime_range(
         self, start: date, end: date, delta: timedelta
@@ -53,11 +57,17 @@ class AdsInsightStream(FacebookStream):
             start += delta
 
     def get_records(self, context: dict | None) -> t.Iterable[dict[str, t.Any]]:
-        start_date = (
-            datetime.strptime(self.config.get("start_date", ""), "%Y-%m-%d").date()
-            if self.config.get("start_date", "")
-            else (date.today() - timedelta(days=30))
-        )
+        # Try getting start_date from the state
+        if context and "current_start" in context:
+            start_date = datetime.strptime(context["current_start"], "%Y-%m-%d").date()
+        else:
+            # If not in state, fetch from config or default to 30 days ago
+            start_date = (
+                datetime.strptime(self.config.get("start_date", ""), "%Y-%m-%d").date()
+                if self.config.get("start_date", "")
+                else (date.today() - timedelta(days=30))
+            )
+
         end_date = (
             datetime.strptime(self.config.get("end_date", ""), "%Y-%m-%d").date()
             if self.config.get("end_date", "")
@@ -120,12 +130,7 @@ class AdsInsightStream(FacebookStream):
         ]
 
         # timerange = f"timerange={{'since':'2023-04-10', 'until':'2023-04-11'}}"
-        return f"/insights?level=ad&&fields={columns}"
-
-    replication_keys = ["date_start"]
-    replication_method = "incremental"
-
-    tap_stream_id = "adsinsights"
+        return f"/insights?level=ad&status=ACTIVE&fields={columns}"
 
     # columns_remaining = [  # noqa: RUF012
     #     "unique_actions",
@@ -160,13 +165,23 @@ class AdsInsightStream(FacebookStream):
         Property("unique_ctr", StringType),
         Property("ctr", StringType),
         Property("reach", StringType),
-        Property("cost_per_unique_action_type", StringType, default="[]"),
-        Property("cost_per_action_type", StringType, default="[]"),
-        Property("actions", StringType, default="[]"),
-        Property("action_values", StringType, default="[]"),
-        Property("conversions", StringType, default="[]"),
-        Property("cost_per_conversion", StringType, default="[]"),
-        Property("website_purchase_roas", StringType, default="[]"),
+        Property(
+            "cost_per_unique_action_type",
+            StringType,
+            default="[{'dummy': 'dummyvalue'}]",
+        ),
+        Property(
+            "cost_per_action_type", StringType, default="[{'dummy': 'dummyvalue'}]"
+        ),
+        Property("actions", StringType, default="[{'dummy': 'dummyvalue'}]"),
+        Property("action_values", StringType, default="[{'dummy': 'dummyvalue'}]"),
+        Property("conversions", StringType, default="[{'dummy': 'dummyvalue'}]"),
+        Property(
+            "cost_per_conversion", StringType, default="[{'dummy': 'dummyvalue'}]"
+        ),
+        Property(
+            "website_purchase_roas", StringType, default="[{'dummy': 'dummyvalue'}]"
+        ),
         Property("date_start", DateTimeType),
         Property("date_stop", DateTimeType),
         ## Additional properties
@@ -174,7 +189,6 @@ class AdsInsightStream(FacebookStream):
         # Property("unique_clicks", StringType),
         # Property("social_spend", StringType),
         # Property("account_id", StringType),
-        # Property("date_start", DateTimeType),
     ).to_dict()
 
     tap_stream_id = "adsinsights"
