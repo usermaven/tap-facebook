@@ -42,9 +42,8 @@ class AdsInsightStream(FacebookStream):
     """
 
     name = "adsinsights"
-    replication_keys = ["current_start"]
+    replication_key = "date_start"
     replication_method = "incremental"
-    state_message_frequency = 10
     tap_stream_id = "adsinsights"
 
     def datetime_range(
@@ -58,8 +57,15 @@ class AdsInsightStream(FacebookStream):
 
     def get_records(self, context: dict | None) -> t.Iterable[dict[str, t.Any]]:
         # Try getting start_date from the state
-        if context and "current_start" in context:
-            start_date = datetime.strptime(context["current_start"], "%Y-%m-%d").date()
+
+        if self.get_replication_key_signpost(context):
+            logger.info(
+                f"Replication key found in state, {self.get_replication_key_signpost(context)} {type(self.get_replication_key_signpost(context))}"
+            )
+            start_date = self.get_replication_key_signpost(context).date()
+            # datetime.strptime(
+            # self.get_replication_key_signpost(context), "%Y-%m-%d"
+            # ).date()
         else:
             # If not in state, fetch from config or default to 30 days ago
             start_date = (
@@ -74,6 +80,9 @@ class AdsInsightStream(FacebookStream):
             else date.today()
         )
         delta = timedelta(days=1)
+
+        # logger.info(f"Start Date: {start_date}, End Date: {end_date}, Delta: {delta}")
+        # start_date = start_date.today() - timedelta(days=1)
         for current_start in self.datetime_range(start_date, end_date, delta):
             if context is None:
                 context = {}
@@ -86,6 +95,8 @@ class AdsInsightStream(FacebookStream):
                     # Record filtered out during post_process()
                     continue
                 yield transformed_record
+
+        self._write_state_message()
 
     def get_url(self, context: dict | None) -> str:
         url = FacebookStream.get_url(self, context)
@@ -218,9 +229,9 @@ class AdsInsightStream(FacebookStream):
         params["limit"] = 25
         if next_page_token is not None:
             params["after"] = next_page_token
-        if self.replication_key:
-            params["sort"] = "asc"
-            params["order_by"] = self.replication_key
+        # if self.replication_key:
+        #     params["sort"] = "asc"
+        #     params["order_by"] = self.replication_key
         today_date = datetime.now().date()
         formatted_date = today_date.strftime("%Y-%m-%d")
         params["action_attribution_windows"] = '["7d_click"]'
