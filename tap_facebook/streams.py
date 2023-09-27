@@ -130,7 +130,7 @@ class AdsInsightStream(FacebookStream):
             time_range = f"{{'since':'{str(start)}', 'until':'{str(stop)}'}}"
 
             context["time_range"] = time_range
-            context["last_sync_time"] = str(until)
+            context["last_sync_time"] = str(stop)
             # context["replication_key_value"] = str(until)
             self._write_starting_replication_value(context)
             for record in self.request_records(context):
