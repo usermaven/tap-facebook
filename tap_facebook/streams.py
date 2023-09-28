@@ -236,23 +236,24 @@ class AdsInsightStream(FacebookStream):
         Property("unique_ctr", StringType),
         Property("ctr", StringType),
         Property("reach", StringType),
-        Property(
-            "cost_per_unique_action_type",
-            StringType,
-            default="[{'dummy': 'dummyvalue'}]",
-        ),
-        Property(
-            "cost_per_action_type", StringType, default="[{'dummy': 'dummyvalue'}]"
-        ),
-        Property("actions", StringType, default="[{'dummy': 'dummyvalue'}]"),
-        Property("action_values", StringType, default="[{'dummy': 'dummyvalue'}]"),
-        Property("conversions", StringType, default="[{'dummy': 'dummyvalue'}]"),
-        Property(
-            "cost_per_conversion", StringType, default="[{'dummy': 'dummyvalue'}]"
-        ),
-        Property(
-            "website_purchase_roas", StringType, default="[{'dummy': 'dummyvalue'}]"
-        ),
+        # We no longer need these.
+        # Property(
+        #     "cost_per_unique_action_type",
+        #     StringType,
+        #     default="[{'dummy': 'dummyvalue'}]",
+        # ),
+        # Property(
+        #     "cost_per_action_type", StringType, default="[{'dummy': 'dummyvalue'}]"
+        # ),
+        # Property("actions", StringType, default="[{'dummy': 'dummyvalue'}]"),
+        # Property("action_values", StringType, default="[{'dummy': 'dummyvalue'}]"),
+        # Property("conversions", StringType, default="[{'dummy': 'dummyvalue'}]"),
+        # Property(
+        #     "cost_per_conversion", StringType, default="[{'dummy': 'dummyvalue'}]"
+        # ),
+        # Property(
+        #     "website_purchase_roas", StringType, default="[{'dummy': 'dummyvalue'}]"
+        # ),
         Property("date_start", DateTimeType),
         Property("date_stop", DateTimeType),
         ## Additional properties
@@ -286,7 +287,7 @@ class AdsInsightStream(FacebookStream):
             A dictionary of URL query parameters.
         """
         params: dict = {}
-        params["limit"] = 25
+        params["limit"] = 100
         if next_page_token is not None:
             params["after"] = next_page_token
         # if self.replication_key:

@@ -35,6 +35,9 @@ class FacebookStream(RESTStream):
 
     tolerated_http_errors: list[int] = []
 
+    def backoff_jitter(self, value: float) -> float:
+        return super().backoff_jitter(value) + 300.0
+
     @property
     def authenticator(self) -> BearerTokenAuthenticator:
         """Return a new authenticator object.
@@ -89,7 +92,7 @@ class FacebookStream(RESTStream):
             A dictionary of URL query parameters.
         """
         params: dict = {}
-        params["limit"] = 25
+        params["limit"] = 100
         if next_page_token is not None:
             params["after"] = next_page_token
         if self.replication_key:
